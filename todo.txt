@@ -1,0 +1,31 @@
+todo
+-page to add users to (done)
+	-controls add user to user array
+	-users are owners or coworkers
+-login page (done)
+	-login validation
+	-determines how the property page functions
+-property page
+	-if owner (done)
+		-controls to add, update, and remove properties they own
+		-same case for workspaces
+		-properties (adding and deleting done)
+			-size (in square feet)
+			-address
+			-neighbourhood
+			-parking garage or not
+		-workspaces (adding and deleting done)
+			-workspace type
+			-how many people it seats
+			-smoking allowed or not
+			-availability date
+			-lease term (day, week, or month)
+			-price
+	-if coworker (not done)
+		-view workspaces from property array
+		-have controls to filter them
+			-by price, capacity, smoking allowed only
+
+
+https://www.geeksforgeeks.org/how-to-send-data-from-client-side-to-node-js-server-using-ajax-without-page-reloading/
+https://www.w3schools.com/jquery/jquery_ajax_get_post.asp

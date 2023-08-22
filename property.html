@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE-edge">
+	<meta name="viewport" content="width=device-width,initial-scale=1.0">
+	<title>Properties</title>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+	<style>
+		div {
+			margin: 10px;
+		}
+	</style>
+</head>
+<body>
+	<!-- Displays a different message depending on what type of user the current logged in one is -->
+	<h1 id="headerText"></h1>
+	<h2 id="username display"></h2>
+	<br><br>
+	
+	<!-- Div to hold property and workspace creation controls -->
+	<div id="property controls">
+	
+		<!-- add new property controls -->
+		<h2>Add new Property</h2>
+		<form name="addpropertyform" action="/addproperty" method="post" onsubmit="return validatePropertyData()">
+			<input type="number" name="id" placeholder="Enter Numeric ID" required><br><br>
+			<input type="number" name="size" placeholder="Size (square feet)" required><br><br>
+			<input type="text" name="address" placeholder="Enter Address" required><br><br>
+			<input type="text" name="neighbourhood" placeholder="Enter Neighbourhood" required><br><br>
+			<label for="parking">Has Parking Garage?</label>
+			<select id="parking" name="hasgarage">
+				<option value="no">No</option>
+				<option value="yes">Yes</option>
+			</select><br><br>
+			<input type="submit" value="Add Property">
+		</form>
+		<br><br>
+		
+		<!-- add new workspace controls -->
+		<h2>Add new Workspace</h2>
+		<form name="addworkspaceform" action="/addworkspace" method="post" onsubmit="return validateWorkspaceData()">
+		<input type="number" name="propertyid" placeholder="Enter Property ID" required><br><br>
+		<input type="number" name="id" placeholder="Enter Workspace ID" required><br><br>
+        <input type="text" name="type" placeholder="Enter Workspace Type" required><br><br>
+		<input type="number" name="capacity" placeholder="Enter Max Capacity" required><br><br>
+		<label for="availabledate">Availability date</label>
+		<input id="availabledate" type="date" name="availabilitydate" required><br><br>
+		<label for="smoking">Smoking Allowed?</label>
+		<select id="smoking" name="smokingallowed">
+			<option value="no">No</option>
+			<option value="yes">Yes</option>
+		</select><br><br>
+		<input type="number" name="price" placeholder="Enter Lease Price" required><br><br>
+        <input type="submit" value="Add Workspace">
+    </form>
+	</div>
+	
+	
+	<!-- Div to hold controls for searching and filtering -->
+	<div id="filter controls">
+		Price <= <input id="priceFilter" type="number" min=0> Capacity <= <input id="capacityFilter" type="number" min =1>
+		Smoking Allowed <select id="smokingFilter">
+			<option value="no">No</option>
+			<option value="yes">Yes</option>
+		</select>
+		<button onclick="filterWorkspaces()">Filter</button>
+	</div>
+	
+	<div id="search results">
+	
+	</div>
+	
+	<br><br>
+	
+	<!-- Div to hold owned properties and workspaces by the current user if they are an owner -->
+	<div id="owner display">
+		<p>(Please refresh the page when deleting workspaces and properties)</p>
+		<button onclick="ownerDisplay()">Display owned properties and workspaces</button>
+		<h1>Owned Properties</h1>
+		<div id="owned properties">
+			
+		</div>
+		<br><br>
+		<h1>Owned Workspaces</h1>
+		<div id="owned workspaces">
+			
+		</div>
+		
+
+	</div>
+	<br><br>
+	
+	
+	
+</body>
+<script>
+let properties = [];
+let workspaces = [];
+
+// get the current user
+let user = fetchAsync("http://localhost:8080/getuser");
+document.getElementById("property controls").style.display = "none";
+document.getElementById("owner display").style.display = "none";
+document.getElementById("filter controls").style.display = "none";
+document.getElementById("search results").style.display = "none";
+
+let currentUser;
+
+// edit page based on user type
+user.then(
+	function(value){
+		// display the username of the current user at the top of the page
+		document.getElementById("username display").innerHTML = "Logged in as " + value.username;
+		currentUser = value.username;
+		// if the logged in user is a property owner, display controls exclusive to them
+		if(value.type =="owner"){
+			document.getElementById("headerText").innerHTML = "View and manage your owned properties and workspaces";
+			document.getElementById("property controls").style.display = "inline";
+			document.getElementById("owner display").style.display = "inline";
+			userType = "owner";
+		}
+		// user is not an owner, display controls to search for workspaces instead
+		else{
+			document.getElementById("headerText").innerHTML = "View and search for existing workspaces";
+			document.getElementById("filter controls").style.display = "inline";
+			document.getElementById("search results").style.display = "inline";
+			userType = "coworker";
+		}
+	},
+	function(error){
+		document.getElementById("username display").innerHTML = "You are currently not logged in";
+	}
+);
+
+// get property and workspace data when the page loads
+$(document).ready(function(){
+	getData();
+});
+
+async function fetchAsync(url) {
+  let response = await fetch(url);
+  let data = await response.json();
+  return data;
+}
+
+// fetch data through express server get request
+function getData(){
+	propertiesReq = fetchAsync("http://localhost:8080/getproperties");
+	workspacesReq = fetchAsync("http://localhost:8080/getworkspaces");
+	
+	propertiesReq.then(
+	function(value){
+		properties = value;
+		console.log(properties);
+	});
+	workspacesReq.then(
+	function(value){
+		workspaces = value;
+		console.log(workspaces);
+	});
+}
+
+
+// page display based on logged in user type
+
+// if user is an owner
+async function ownerDisplay(){
+
+	let currentUser = fetchAsync("http://localhost:8080/getuser");
+	let ownedproperties = [];
+	let ownedworkspaces = [];
+	
+	currentUser.then(
+		function(value){
+			ownedproperties = properties.filter(p => p.owner == value.username);
+			ownedworkspaces = workspaces.filter(w => w.owner == value.username);
+			// clear the displays
+			document.getElementById("owned properties").innerHTML = '';
+			document.getElementById("owned workspaces").innerHTML = '';
+	
+			// display owned properties
+			for(let i = 0; i < ownedproperties.length; i++){
+				let p = document.createElement("div");
+				p.innerHTML = `
+				<br>
+					<h2>Property ID: ${ownedproperties[i].id}</h2>
+					<h3>Size: ${ownedproperties[i].size}ft²</h3>
+					<h3>Address: ${ownedproperties[i].address}</h3>
+					<h3>Neighbourhood: ${ownedproperties[i].neighbourhood}</h3>
+					<h3>Has Parking Garage?: ${ownedproperties[i].hasgarage}</h3>
+					<button onclick="$.post('/deleteproperty/${ownedproperties[i].id}')">Delete Property</button>
+					<br>`;
+				document.getElementById("owned properties").appendChild(p);
+			}
+	
+			// display owned workspaces
+			for(let i = 0; i < ownedworkspaces.length; i++){
+				let w = document.createElement("div");
+				w.innerHTML = `
+					<br>
+					<h2>Workspace ID: ${ownedworkspaces[i].id}</h2>
+					<h2>Property ID: ${ownedworkspaces[i].propertyid}</h2>
+					<h3>Type: ${ownedworkspaces[i].type}</h3>
+					<h3>Capacity: ${ownedworkspaces[i].capacity}</h3>
+					<h3>Availability Date: ${ownedworkspaces[i].availabilitydate}</h3>
+					<h3>Smoking Allowed?: ${ownedworkspaces[i].smokingallowed}</h3>
+					<h3>Price: $${ownedworkspaces[i].price}</h3>
+					<button onclick="$.post('/deleteworkspace/${ownedworkspaces[i].id}')">Delete Workspace</button>
+					<br>`;
+				document.getElementById("owned workspaces").appendChild(w);
+			}
+				}
+		);
+	
+}
+
+/**
+function deleteProperty(id){
+	alert("Deleted property with ID: " + id);
+	$.post('/deleteproperty/' + id);
+	location.reload();
+}
+
+function deleteWorkspace(id){
+	alert("Deleted workspace with ID: " + id);
+	$.post('/deleteworkspace/' + id);
+	location.reload();
+}
+**/
+// if user is a coworker
+async function coworkerDisplay(){
+	
+}
+
+// filter controls
+function filterWorkspaces(){
+
+	// get values from filter controls
+	let priceRange = parseInt(document.getElementById("priceFilter").value);
+	let capacity = parseInt(document.getElementById("capacityFilter").value);
+	let smokingAllowed = document.getElementById("smokingFilter").value;
+	
+	// clear the display
+	document.getElementById("search results").innerHTML = '';
+	
+	// filter results
+	let results = workspaces.filter(w => w.price <= priceRange && w.capacity <= capacity && w.smokingallowed == smokingAllowed);
+	
+	console.log(results);
+	
+	for(let i = 0; i < results.length; i++){
+		let w = document.createElement("div");
+		w.innerHTML = `
+			<h2>Property ID: ${results[i].propertyid}</h2>
+			<h2>ID: ${results[i].id}</h2>
+			<h2>Type: ${results[i].type}</h2>
+			<h2>Price: $${results[i].price}</h2>
+			<h2>Capacity: ${results[i].capacity}</h2>
+			<h2>Smoking Allowed?: ${results[i].smokingallowed}</h2>
+			<h2>Availability Date: ${results[i].availabilitydate}</h2>
+			<h2>Owner Contact: ${results[i].contact}</h2>
+			<br><br>
+		`;
+		document.getElementById("search results").appendChild(w);
+	}
+}
+
+//form validation for adding new workspaces and properties
+
+// properties
+function validatePropertyData(){
+	let form = document.forms["addpropertyform"];
+	
+	// ensure a property with the input id does not already exist
+	let found = properties.filter(p => p.id == form.id.value)
+	// property with that id exists
+	if(found.length > 0){
+		alert("A property with that specified ID already exists");
+		return false;
+	}
+	
+	// property with that id doesn't exist, submit property data to server
+	alert("Successfully added new property");
+	return true;
+}
+
+// workspaces
+async function validateWorkspaceData(){
+	/**
+	let promise = fetchAsync("http://localhost:8080/getuser");
+	
+	promise.then(
+		function(value){
+			let form = document.forms["addworkspaceform"];
+	
+			// ensure a property with the specified property id exists and the current user owns the property specified
+			let found = properties.filter(p => p.id == form.propertyid.value && p.owner == value.username);
+			// property with that id exists
+			if(found.length < 1){
+				alert("A property with that specified ID does not exist");
+				return false;
+			}
+	
+			// ensure a workspace with the specified id doesn't already exist
+			found = workspaces.filter(w => w.id == form.id.value);
+			if(found.length > 0){
+				alert("A workspace with that specified ID already exists");
+				return false;
+			}
+	
+			// specified property exists and no workspace with the same id exists either, send data to server
+			alert("Successfully added new workspace");
+			return true;
+		}
+	);
+	**/
+	
+	let form = document.forms["addworkspaceform"];
+	
+			// ensure a property with the specified property id exists and the current user owns the property specified
+			let found = properties.filter(p => p.id == form.propertyid.value && p.owner == currentUser);
+			// property with that id exists
+			if(found.length < 1){
+				alert("A property with that specified ID does not exist");
+				return false;
+			}
+	
+			// ensure a workspace with the specified id doesn't already exist
+			found = workspaces.filter(w => w.id == form.id.value);
+			if(found.length > 0){
+				alert("A workspace with that specified ID already exists");
+				return false;
+			}
+	
+			// specified property exists and no workspace with the same id exists either, send data to server
+			alert("Successfully added new workspace");
+			return true;
+	
+	
+}
+
+</script>
+</html>
